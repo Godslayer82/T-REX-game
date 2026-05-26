@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>T-Rex Runner</title>
 
 <style>
@@ -29,7 +29,7 @@
         width: 50px;
         height: 50px;
         background: #333;
-        border-radius: 8px;
+        border-radius: 10px;
     }
 
     .cactus {
@@ -38,7 +38,7 @@
         width: 25px;
         height: 50px;
         background: green;
-        right: -30px;
+        border-radius: 4px;
     }
 
     #score {
@@ -57,6 +57,15 @@
         font-size: 40px;
         color: red;
         display: none;
+        font-weight: bold;
+    }
+
+    #controls {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        color: #666;
+        font-size: 14px;
     }
 </style>
 </head>
@@ -66,10 +75,103 @@
 <div id="game">
     <div id="dino"></div>
     <div id="score">0</div>
-    <div id="gameOver">GAME OVER<br>Press SPACE to Restart</div>
+
+    <div id="gameOver">
+        GAME OVER<br>
+        Press SPACE to Restart
+    </div>
+
+    <div id="controls">
+        SPACE = Jump
+    </div>
 </div>
 
 <script>
+/* =========================
+   AUDIO SYSTEM
+========================= */
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playTone(freq, duration, type = "square", volume = 0.05) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.type = type;
+    osc.frequency.value = freq;
+
+    gain.gain.value = volume;
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.start();
+
+    gain.gain.exponentialRampToValueAtTime(
+        0.0001,
+        audioCtx.currentTime + duration
+    );
+
+    osc.stop(audioCtx.currentTime + duration);
+}
+
+function jumpSound() {
+    playTone(500, 0.1, "square", 0.06);
+}
+
+function scoreSound() {
+    playTone(800, 0.08, "triangle", 0.05);
+}
+
+function gameOverSound() {
+    playTone(300, 0.3, "sawtooth", 0.07);
+
+    setTimeout(() => {
+        playTone(150, 0.4, "sawtooth", 0.07);
+    }, 120);
+}
+
+/* =========================
+   BACKGROUND MUSIC
+========================= */
+
+let musicInterval;
+
+function startMusic() {
+
+    if (musicInterval) return;
+
+    const notes = [
+        262, 330, 392, 330,
+        262, 330, 440, 392
+    ];
+
+    let index = 0;
+
+    musicInterval = setInterval(() => {
+
+        if (!gameRunning) return;
+
+        playTone(notes[index], 0.12, "triangle", 0.02);
+
+        index++;
+
+        if (index >= notes.length) {
+            index = 0;
+        }
+
+    }, 250);
+}
+
+function stopMusic() {
+    clearInterval(musicInterval);
+    musicInterval = null;
+}
+
+/* =========================
+   GAME VARIABLES
+========================= */
+
 const dino = document.getElementById("dino");
 const game = document.getElementById("game");
 const scoreDisplay = document.getElementById("score");
@@ -82,16 +184,36 @@ let position = 0;
 
 let gameRunning = true;
 let score = 0;
+let gameStarted = false;
+
+/* =========================
+   JUMP FUNCTION
+========================= */
 
 function jump() {
-    if (jumping) return;
+
+    if (jumping || !gameRunning) return;
 
     jumping = true;
     velocity = 18;
+
+    jumpSound();
 }
 
+/* =========================
+   CONTROLS
+========================= */
+
 document.addEventListener("keydown", (e) => {
+
     if (e.code === "Space") {
+
+        if (!gameStarted) {
+            audioCtx.resume();
+            startMusic();
+            gameStarted = true;
+        }
+
         if (!gameRunning) {
             restartGame();
         } else {
@@ -100,7 +222,12 @@ document.addEventListener("keydown", (e) => {
     }
 });
 
+/* =========================
+   DINO PHYSICS
+========================= */
+
 function updateDino() {
+
     velocity -= gravity;
     position += velocity;
 
@@ -112,18 +239,25 @@ function updateDino() {
     dino.style.bottom = position + "px";
 }
 
+/* =========================
+   CREATE CACTUS
+========================= */
+
 function createCactus() {
+
     if (!gameRunning) return;
 
     const cactus = document.createElement("div");
     cactus.classList.add("cactus");
 
     let cactusX = window.innerWidth;
+
     cactus.style.left = cactusX + "px";
 
     game.appendChild(cactus);
 
     const moveInterval = setInterval(() => {
+
         if (!gameRunning) {
             clearInterval(moveInterval);
             cactus.remove();
@@ -133,10 +267,10 @@ function createCactus() {
         cactusX -= 8;
         cactus.style.left = cactusX + "px";
 
-        // Collision detection
         const dinoRect = dino.getBoundingClientRect();
         const cactusRect = cactus.getBoundingClientRect();
 
+        // COLLISION
         if (
             dinoRect.right > cactusRect.left &&
             dinoRect.left < cactusRect.right &&
@@ -145,26 +279,46 @@ function createCactus() {
             gameOver();
         }
 
+        // SCORE
         if (cactusX < -50) {
+
             cactus.remove();
             clearInterval(moveInterval);
 
             score++;
             scoreDisplay.innerText = score;
+
+            scoreSound();
         }
 
     }, 20);
 
     const nextSpawn = Math.random() * 2000 + 1000;
+
     setTimeout(createCactus, nextSpawn);
 }
 
+/* =========================
+   GAME OVER
+========================= */
+
 function gameOver() {
+
     gameRunning = false;
+
     gameOverText.style.display = "block";
+
+    stopMusic();
+
+    gameOverSound();
 }
 
+/* =========================
+   RESTART GAME
+========================= */
+
 function restartGame() {
+
     document.querySelectorAll(".cactus").forEach(c => c.remove());
 
     score = 0;
@@ -174,12 +328,20 @@ function restartGame() {
     velocity = 0;
 
     gameRunning = true;
+
     gameOverText.style.display = "none";
+
+    startMusic();
 
     createCactus();
 }
 
+/* =========================
+   GAME LOOP
+========================= */
+
 function gameLoop() {
+
     if (gameRunning) {
         updateDino();
     }
@@ -187,8 +349,13 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
+/* =========================
+   START GAME
+========================= */
+
 createCactus();
 gameLoop();
+
 </script>
 
 </body>
