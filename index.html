@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>T-Rex Runner</title>
+
+<style>
+    body {
+        margin: 0;
+        overflow: hidden;
+        background: #f7f7f7;
+        font-family: Arial, sans-serif;
+    }
+
+    #game {
+        position: relative;
+        width: 100vw;
+        height: 300px;
+        border-bottom: 4px solid #333;
+        overflow: hidden;
+        background: white;
+    }
+
+    #dino {
+        position: absolute;
+        bottom: 0;
+        left: 50px;
+        width: 50px;
+        height: 50px;
+        background: #333;
+        border-radius: 8px;
+    }
+
+    .cactus {
+        position: absolute;
+        bottom: 0;
+        width: 25px;
+        height: 50px;
+        background: green;
+        right: -30px;
+    }
+
+    #score {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        font-size: 24px;
+        color: #333;
+    }
+
+    #gameOver {
+        position: absolute;
+        width: 100%;
+        text-align: center;
+        top: 100px;
+        font-size: 40px;
+        color: red;
+        display: none;
+    }
+</style>
+</head>
+
+<body>
+
+<div id="game">
+    <div id="dino"></div>
+    <div id="score">0</div>
+    <div id="gameOver">GAME OVER<br>Press SPACE to Restart</div>
+</div>
+
+<script>
+const dino = document.getElementById("dino");
+const game = document.getElementById("game");
+const scoreDisplay = document.getElementById("score");
+const gameOverText = document.getElementById("gameOver");
+
+let jumping = false;
+let velocity = 0;
+let gravity = 1;
+let position = 0;
+
+let gameRunning = true;
+let score = 0;
+
+function jump() {
+    if (jumping) return;
+
+    jumping = true;
+    velocity = 18;
+}
+
+document.addEventListener("keydown", (e) => {
+    if (e.code === "Space") {
+        if (!gameRunning) {
+            restartGame();
+        } else {
+            jump();
+        }
+    }
+});
+
+function updateDino() {
+    velocity -= gravity;
+    position += velocity;
+
+    if (position <= 0) {
+        position = 0;
+        jumping = false;
+    }
+
+    dino.style.bottom = position + "px";
+}
+
+function createCactus() {
+    if (!gameRunning) return;
+
+    const cactus = document.createElement("div");
+    cactus.classList.add("cactus");
+
+    let cactusX = window.innerWidth;
+    cactus.style.left = cactusX + "px";
+
+    game.appendChild(cactus);
+
+    const moveInterval = setInterval(() => {
+        if (!gameRunning) {
+            clearInterval(moveInterval);
+            cactus.remove();
+            return;
+        }
+
+        cactusX -= 8;
+        cactus.style.left = cactusX + "px";
+
+        // Collision detection
+        const dinoRect = dino.getBoundingClientRect();
+        const cactusRect = cactus.getBoundingClientRect();
+
+        if (
+            dinoRect.right > cactusRect.left &&
+            dinoRect.left < cactusRect.right &&
+            dinoRect.bottom > cactusRect.top
+        ) {
+            gameOver();
+        }
+
+        if (cactusX < -50) {
+            cactus.remove();
+            clearInterval(moveInterval);
+
+            score++;
+            scoreDisplay.innerText = score;
+        }
+
+    }, 20);
+
+    const nextSpawn = Math.random() * 2000 + 1000;
+    setTimeout(createCactus, nextSpawn);
+}
+
+function gameOver() {
+    gameRunning = false;
+    gameOverText.style.display = "block";
+}
+
+function restartGame() {
+    document.querySelectorAll(".cactus").forEach(c => c.remove());
+
+    score = 0;
+    scoreDisplay.innerText = score;
+
+    position = 0;
+    velocity = 0;
+
+    gameRunning = true;
+    gameOverText.style.display = "none";
+
+    createCactus();
+}
+
+function gameLoop() {
+    if (gameRunning) {
+        updateDino();
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+createCactus();
+gameLoop();
+</script>
+
+</body>
+</html>
